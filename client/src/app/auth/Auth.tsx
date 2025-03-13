@@ -1,8 +1,11 @@
 "use client";
 
 import axios from "axios";
+import DeviceDetector from "device-detector-js";
 import { useState } from "react";
-import { deviceDetect } from "react-device-detect";
+
+// Define the DeviceType if not already provided by the library
+type DeviceType = "mobile" | "tablet" | "desktop" | "smarttv" | "unknown";
 
 interface User {
 	telegramId: string;
@@ -38,17 +41,33 @@ export const Auth = () => {
 			if (response.data.success) {
 				const user = response.data.user;
 
-				// Получаем данные об устройстве
-				const deviceInfo = deviceDetect(navigator.userAgent);
+				// Создаем экземпляр DeviceDetector
+				const deviceDetector = new DeviceDetector();
+				const userAgent = navigator.userAgent;
 
-				// Добавляем дополнительные данные
+				// Анализируем userAgent
+				const deviceInfo = deviceDetector.parse(userAgent);
+
+				// Определяем тип устройства
+				let deviceType = "Неизвестно";
+				const deviceTypeValue = deviceInfo.device?.type as
+					| DeviceType
+					| undefined; // Explicitly type deviceTypeValue
+
+				if (deviceTypeValue === "mobile") {
+					deviceType = "Мобильное устройство";
+				} else if (deviceTypeValue === "tablet") {
+					deviceType = "Планшет";
+				} else if (deviceTypeValue === "desktop") {
+					deviceType = "Десктоп";
+				}
+
+				// Формируем полную информацию об устройстве
 				const fullDeviceInfo = {
-					browser: deviceInfo.browserName,
-					browserVersion: deviceInfo.browserVersion,
-					deviceType: deviceInfo.deviceType,
-					os: deviceInfo.osName,
-					isMobile: deviceInfo.isMobile,
-					userAgent: navigator.userAgent,
+					deviceType,
+					browser: deviceInfo.client?.name || "Неизвестно",
+					os: deviceInfo.os?.name || "Неизвестно",
+					userAgent: userAgent,
 				};
 
 				// Отправляем данные об устройстве на бэкенд
@@ -61,11 +80,22 @@ export const Auth = () => {
 			} else {
 				setError(response.data.message || "Неверный код авторизации");
 			}
-		} catch (err) {
+		} catch (err: any) {
+			console.error(
+				"Ошибка при запросе к бэкенду:",
+				err?.response?.data || err.message
+			);
 			setError("Произошла ошибка при проверке кода");
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const handleLogout = () => {
+		// Очищаем данные пользователя
+		setUserData(null);
+		setAuthCode("");
+		setError("");
 	};
 
 	return (
@@ -96,6 +126,8 @@ export const Auth = () => {
 					<p>ID: {userData.telegramId}</p>
 					<p>Фамилия: {userData.lastName || "Не указана"}</p>
 					<p>Username: {userData.username || "Не указан"}</p>
+
+					<button onClick={handleLogout}>Выйти</button>
 				</div>
 			)}
 		</div>
